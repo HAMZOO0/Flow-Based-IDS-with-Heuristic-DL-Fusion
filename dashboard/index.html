@@ -1,0 +1,1413 @@
+<!doctype html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>DDoS Sentinel — Live Attack Dashboard</title>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+      <link
+         href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap"
+         rel="stylesheet"
+      />
+      <style>
+         :root {
+            --bg: #060a0f;
+            --bg2: #0b1118;
+            --bg3: #0f1923;
+            --border: #1a2a3a;
+            --accent: #00d4ff;
+            --accent2: #ff3366;
+            --accent3: #00ff88;
+            --warn: #ffaa00;
+            --text: #c8d8e8;
+            --muted: #4a6070;
+            --font-mono: "Share Tech Mono", monospace;
+            --font-ui: "Rajdhani", sans-serif;
+         }
+
+         * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+         }
+
+         body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-ui);
+            font-size: 14px;
+            min-height: 100vh;
+            overflow-x: hidden;
+         }
+
+         /* scanline overlay */
+         body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+               0deg,
+               transparent,
+               transparent 2px,
+               rgba(0, 212, 255, 0.015) 2px,
+               rgba(0, 212, 255, 0.015) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+         }
+
+         /* ── HEADER ── */
+         header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 28px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+         }
+
+         .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+         }
+
+         .logo-icon {
+            width: 36px;
+            height: 36px;
+            border: 2px solid var(--accent);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            animation: pulse-border 2s ease-in-out infinite;
+         }
+
+         .logo-icon::after {
+            content: "";
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            animation: pulse-inner 2s ease-in-out infinite;
+         }
+
+         @keyframes pulse-border {
+            0%,
+            100% {
+               box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.4);
+            }
+            50% {
+               box-shadow: 0 0 0 6px rgba(0, 212, 255, 0);
+            }
+         }
+         @keyframes pulse-inner {
+            0%,
+            100% {
+               opacity: 1;
+            }
+            50% {
+               opacity: 0.4;
+            }
+         }
+
+         .logo-text h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: var(--accent);
+            text-transform: uppercase;
+         }
+
+         .logo-text p {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 2px;
+         }
+
+         .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+         }
+
+         .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border: 1px solid var(--accent3);
+            border-radius: 20px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--accent3);
+         }
+
+         .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent3);
+            animation: blink 1s step-end infinite;
+         }
+
+         @keyframes blink {
+            50% {
+               opacity: 0;
+            }
+         }
+
+         #file-input-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+         }
+
+         .btn {
+            padding: 7px 18px;
+            border: 1px solid var(--accent);
+            background: transparent;
+            color: var(--accent);
+            font-family: var(--font-ui);
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+         }
+
+         .btn:hover {
+            background: var(--accent);
+            color: var(--bg);
+         }
+
+         #json-file {
+            display: none;
+         }
+
+         #last-updated {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--muted);
+         }
+
+         /* ── STAT CARDS ── */
+         .stat-row {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+         }
+
+         .stat-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px 16px;
+            position: relative;
+            overflow: hidden;
+         }
+
+         .stat-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+         }
+
+         .stat-card.c-blue::before {
+            background: var(--accent);
+         }
+         .stat-card.c-red::before {
+            background: var(--accent2);
+         }
+         .stat-card.c-green::before {
+            background: var(--accent3);
+         }
+         .stat-card.c-warn::before {
+            background: var(--warn);
+         }
+
+         .stat-label {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+         }
+
+         .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1;
+         }
+
+         .stat-card.c-blue .stat-value {
+            color: var(--accent);
+         }
+         .stat-card.c-red .stat-value {
+            color: var(--accent2);
+         }
+         .stat-card.c-green .stat-value {
+            color: var(--accent3);
+         }
+         .stat-card.c-warn .stat-value {
+            color: var(--warn);
+         }
+
+         .stat-sub {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 4px;
+         }
+
+         /* ── MAIN GRID ── */
+         .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 12px;
+            padding: 12px 24px;
+         }
+
+         .panel {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+         }
+
+         .panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+         }
+
+         .panel-title {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+         }
+
+         .panel-title::before {
+            content: "";
+            width: 3px;
+            height: 12px;
+            background: var(--accent);
+            border-radius: 2px;
+         }
+
+         .panel-body {
+            padding: 16px;
+         }
+
+         /* ── MAP — full width ── */
+         .map-panel {
+            grid-column: 1 / -1;
+            min-height: 380px;
+         }
+
+         #world-map {
+            width: 100%;
+            height: 340px;
+            position: relative;
+            background: var(--bg);
+            border-radius: 4px;
+            overflow: hidden;
+         }
+
+         #world-map svg {
+            width: 100%;
+            height: 100%;
+         }
+
+         .map-tooltip {
+            position: absolute;
+            background: var(--bg3);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--accent);
+            pointer-events: none;
+            display: none;
+            z-index: 50;
+            white-space: nowrap;
+         }
+
+         /* ── CHARTS ROW ── */
+         .chart-panel {
+            min-height: 280px;
+         }
+
+         canvas {
+            max-height: 230px;
+         }
+
+         /* ── ALERT FEED ── */
+         .alert-feed {
+            grid-column: 3;
+            grid-row: 2;
+            max-height: 290px;
+            overflow-y: auto;
+         }
+
+         .alert-feed::-webkit-scrollbar {
+            width: 4px;
+         }
+         .alert-feed::-webkit-scrollbar-track {
+            background: var(--bg);
+         }
+         .alert-feed::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+         }
+
+         .alert-item {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            animation: slide-in 0.3s ease;
+         }
+
+         @keyframes slide-in {
+            from {
+               opacity: 0;
+               transform: translateX(10px);
+            }
+            to {
+               opacity: 1;
+               transform: translateX(0);
+            }
+         }
+
+         .alert-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-top: 3px;
+            flex-shrink: 0;
+         }
+
+         .alert-dot.red {
+            background: var(--accent2);
+            box-shadow: 0 0 6px var(--accent2);
+         }
+         .alert-dot.yellow {
+            background: var(--warn);
+            box-shadow: 0 0 6px var(--warn);
+         }
+         .alert-dot.green {
+            background: var(--accent3);
+            box-shadow: 0 0 6px var(--accent3);
+         }
+         .alert-dot.blue {
+            background: var(--accent);
+            box-shadow: 0 0 6px var(--accent);
+         }
+
+         .alert-content {
+            flex: 1;
+            min-width: 0;
+         }
+         .alert-label {
+            font-weight: 600;
+         }
+         .alert-label.attack {
+            color: var(--accent2);
+         }
+         .alert-label.normal {
+            color: var(--accent3);
+         }
+         .alert-label.scan {
+            color: var(--warn);
+         }
+         .alert-ip {
+            color: var(--muted);
+            font-size: 10px;
+            margin-top: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+         }
+         .alert-time {
+            color: var(--muted);
+            font-size: 10px;
+            flex-shrink: 0;
+         }
+
+         /* ── TOP IPs TABLE ── */
+         .ip-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--font-mono);
+            font-size: 11px;
+         }
+         .ip-table th {
+            color: var(--muted);
+            font-weight: 400;
+            letter-spacing: 1px;
+            text-align: left;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border);
+         }
+         .ip-table td {
+            padding: 7px 8px;
+            border-bottom: 1px solid rgba(26, 42, 58, 0.5);
+         }
+         .ip-table tr:hover td {
+            background: rgba(0, 212, 255, 0.03);
+         }
+         .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+         }
+         .badge.dos {
+            background: rgba(255, 51, 102, 0.15);
+            color: var(--accent2);
+            border: 1px solid rgba(255, 51, 102, 0.3);
+         }
+         .badge.scan {
+            background: rgba(255, 170, 0, 0.15);
+            color: var(--warn);
+            border: 1px solid rgba(255, 170, 0, 0.3);
+         }
+         .badge.normal {
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--accent3);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+         }
+         .badge.ddos {
+            background: rgba(255, 51, 102, 0.25);
+            color: #ff6688;
+            border: 1px solid rgba(255, 51, 102, 0.4);
+         }
+         .badge.brute {
+            background: rgba(160, 80, 255, 0.15);
+            color: #c080ff;
+            border: 1px solid rgba(160, 80, 255, 0.3);
+         }
+
+         .bar-bg {
+            background: var(--border);
+            border-radius: 2px;
+            height: 4px;
+            margin-top: 3px;
+         }
+         .bar-fill {
+            height: 4px;
+            border-radius: 2px;
+         }
+
+         /* ── DECISION SOURCE PANEL ── */
+         .source-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+         }
+         .source-item {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px;
+            text-align: center;
+         }
+         .source-badge {
+            font-family: var(--font-mono);
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+         }
+         .source-count {
+            font-size: 22px;
+            font-weight: 700;
+         }
+         .source-label {
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 1px;
+            margin-top: 2px;
+         }
+
+         /* ── EMPTY STATE ── */
+         .empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--muted);
+            font-family: var(--font-mono);
+            font-size: 12px;
+         }
+
+         .empty-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.4;
+         }
+
+         /* ── DEMO banner ── */
+         #demo-banner {
+            background: rgba(255, 170, 0, 0.08);
+            border-bottom: 1px solid rgba(255, 170, 0, 0.2);
+            padding: 8px 24px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--warn);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+         }
+      </style>
+   </head>
+   <body>
+      <!-- HEADER -->
+      <header>
+         <div class="logo">
+            <div class="logo-icon"></div>
+            <div class="logo-text">
+               <h1>DDoS Sentinel</h1>
+               <p>HYBRID _ — LIVE ATTACK DASHBOARD</p>
+            </div>
+         </div>
+         <div class="header-right">
+            <div id="file-input-wrap">
+               <input type="file" id="json-file" accept=".json" />
+               <button class="btn" onclick="document.getElementById('json-file').click()">Load ids_logs.json</button>
+               <button class="btn" onclick="loadDemo()" style="border-color: var(--warn); color: var(--warn)">
+                  Demo Data
+               </button>
+            </div>
+            <div class="status-pill">
+               <div class="status-dot"></div>
+               <span id="status-text">AWAITING DATA</span>
+            </div>
+            <div id="last-updated">—</div>
+         </div>
+      </header>
+
+      <!-- DEMO BANNER -->
+      <div id="demo-banner" style="display: none">⚡ DEMO MODE — Load your real ids_logs.json for live data</div>
+
+      <!-- STAT CARDS -->
+      <div class="stat-row">
+         <div class="stat-card c-blue">
+            <div class="stat-label">Total Flows</div>
+            <div class="stat-value" id="s-total">—</div>
+            <div class="stat-sub">captured</div>
+         </div>
+         <div class="stat-card c-red">
+            <div class="stat-label">Attacks</div>
+            <div class="stat-value" id="s-attacks">—</div>
+            <div class="stat-sub" id="s-attack-pct">—</div>
+         </div>
+         <div class="stat-card c-warn">
+            <div class="stat-label">Port Scans</div>
+            <div class="stat-value" id="s-scan">—</div>
+            <div class="stat-sub">unique src IPs</div>
+         </div>
+         <div class="stat-card c-red">
+            <div class="stat-label">DoS / DDoS</div>
+            <div class="stat-value" id="s-dos">—</div>
+            <div class="stat-sub">flow events</div>
+         </div>
+         <div class="stat-card c-green">
+            <div class="stat-label">Normal</div>
+            <div class="stat-value" id="s-normal">—</div>
+            <div class="stat-sub">benign flows</div>
+         </div>
+         <div class="stat-card c-blue">
+            <div class="stat-label">Unique IPs</div>
+            <div class="stat-value" id="s-ips">—</div>
+            <div class="stat-sub">src addresses</div>
+         </div>
+      </div>
+
+      <!-- MAIN GRID -->
+      <div class="main-grid">
+         <!-- WORLD MAP -->
+         <div class="panel map-panel">
+            <div class="panel-header">
+               <div class="panel-title">Attack Origin Map</div>
+               <span style="font-family: var(--font-mono); font-size: 10px; color: var(--muted)"
+                  >GEOLOCATION — SRC IP</span
+               >
+            </div>
+            <div class="panel-body" style="padding: 12px">
+               <div id="world-map">
+                  <div class="map-tooltip" id="map-tooltip"></div>
+               </div>
+            </div>
+         </div>
+
+         <!-- LABEL DISTRIBUTION -->
+         <div class="panel chart-panel">
+            <div class="panel-header">
+               <div class="panel-title">Label Distribution</div>
+            </div>
+            <div class="panel-body">
+               <canvas id="chart-labels"></canvas>
+            </div>
+         </div>
+
+         <!-- TIMELINE -->
+         <div class="panel chart-panel">
+            <div class="panel-header">
+               <div class="panel-title">Attack Timeline</div>
+            </div>
+            <div class="panel-body">
+               <canvas id="chart-timeline"></canvas>
+            </div>
+         </div>
+
+         <!-- ALERT FEED -->
+         <div class="panel alert-feed" style="overflow: hidden; display: flex; flex-direction: column">
+            <div class="panel-header" style="flex-shrink: 0">
+               <div class="panel-title">Live Alert Feed</div>
+               <span id="alert-count" style="font-family: var(--font-mono); font-size: 10px; color: var(--muted)"
+                  >0 events</span
+               >
+            </div>
+            <div id="alert-list" style="overflow-y: auto; flex: 1">
+               <div class="empty">
+                  <div class="empty-icon">◈</div>
+                  No events yet
+               </div>
+            </div>
+         </div>
+
+         <!-- TOP IPs -->
+         <div class="panel chart-panel">
+            <div class="panel-header">
+               <div class="panel-title">Top Source IPs</div>
+            </div>
+            <div class="panel-body" style="padding: 8px">
+               <div id="ip-table-wrap">
+                  <div class="empty">
+                     <div class="empty-icon">◈</div>
+                     No data
+                  </div>
+               </div>
+            </div>
+         </div>
+
+         <!-- FLAG CHART -->
+         <div class="panel chart-panel">
+            <div class="panel-header">
+               <div class="panel-title">TCP Flags — Attacks vs Normal</div>
+            </div>
+            <div class="panel-body">
+               <canvas id="chart-flags"></canvas>
+            </div>
+         </div>
+
+         <!-- DECISION SOURCE -->
+         <div class="panel chart-panel">
+            <div class="panel-header">
+               <div class="panel-title">Decision Source</div>
+               <span style="font-family: var(--font-mono); font-size: 10px; color: var(--muted)">[H] [D] [H+D]</span>
+            </div>
+            <div class="panel-body">
+               <div id="source-grid" class="source-grid">
+                  <div class="empty" style="grid-column: 1/-1">
+                     <div class="empty-icon">◈</div>
+                     No data
+                  </div>
+               </div>
+            </div>
+         </div>
+
+         <!-- DL CONFIDENCE -->
+         <div class="panel chart-panel">
+            <div class="panel-header">
+               <div class="panel-title">DL Confidence Distribution</div>
+            </div>
+            <div class="panel-body">
+               <canvas id="chart-conf"></canvas>
+            </div>
+         </div>
+
+         <!-- PROTOCOL SPLIT -->
+         <div class="panel chart-panel">
+            <div class="panel-header">
+               <div class="panel-title">Protocol Split</div>
+            </div>
+            <div class="panel-body">
+               <canvas id="chart-proto"></canvas>
+            </div>
+         </div>
+      </div>
+
+      <script>
+         // ═══════════════════════════════════════════════
+         //  CHART DEFAULTS
+         // ═══════════════════════════════════════════════
+         Chart.defaults.color = "#4a6070";
+         Chart.defaults.borderColor = "#1a2a3a";
+         Chart.defaults.font.family = "'Rajdhani', sans-serif";
+
+         const COLORS = {
+            "Normal Traffic": "#00ff88",
+            DoS: "#ff3366",
+            DDoS: "#ff6688",
+            "Port Scanning": "#ffaa00",
+            "Brute Force": "#c080ff",
+         };
+
+         const chartInstances = {};
+
+         function mkChart(id, config) {
+            if (chartInstances[id]) chartInstances[id].destroy();
+            chartInstances[id] = new Chart(document.getElementById(id), config);
+            return chartInstances[id];
+         }
+
+         // ═══════════════════════════════════════════════
+         //  WORLD MAP (D3 + TopoJSON)
+         // ═══════════════════════════════════════════════
+         let mapSvg, mapProjection, mapPath;
+
+         async function initMap() {
+            const container = document.getElementById("world-map");
+            const W = container.clientWidth,
+               H = container.clientHeight || 340;
+
+            const svg = d3.select("#world-map").append("svg").attr("width", W).attr("height", H);
+
+            mapProjection = d3
+               .geoNaturalEarth1()
+               .scale(W / 6.4)
+               .translate([W / 2, H / 2]);
+
+            mapPath = d3.geoPath().projection(mapProjection);
+
+            // subtle graticule
+            const graticule = d3.geoGraticule();
+            svg.append("path")
+               .datum(graticule())
+               .attr("d", mapPath)
+               .attr("fill", "none")
+               .attr("stroke", "#0f1923")
+               .attr("stroke-width", 0.5);
+
+            try {
+               const world = await d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
+               svg.append("g")
+                  .selectAll("path")
+                  .data(topojson.feature(world, world.objects.countries).features)
+                  .enter()
+                  .append("path")
+                  .attr("d", mapPath)
+                  .attr("fill", "#0b1520")
+                  .attr("stroke", "#1a2a3a")
+                  .attr("stroke-width", 0.4);
+
+               // country borders
+               svg.append("path")
+                  .datum(topojson.mesh(world, world.objects.countries, (a, b) => a !== b))
+                  .attr("d", mapPath)
+                  .attr("fill", "none")
+                  .attr("stroke", "#1e3040")
+                  .attr("stroke-width", 0.3);
+            } catch (e) {
+               // fallback: just a dark rectangle with text
+               svg.append("rect").attr("width", W).attr("height", H).attr("fill", "#0b1118");
+               svg.append("text")
+                  .attr("x", W / 2)
+                  .attr("y", H / 2)
+                  .attr("text-anchor", "middle")
+                  .attr("fill", "#1a2a3a")
+                  .attr("font-family", "Share Tech Mono")
+                  .attr("font-size", 12)
+                  .text("[ MAP REQUIRES INTERNET CONNECTION ]");
+            }
+
+            mapSvg = svg;
+         }
+
+         // IP → approximate lat/lon using first octet heuristics + known ranges
+         // For real geo, you'd call a local IP-API; this approximates for demo
+         function ipToGeo(ip) {
+            // known private ranges → skip
+            if (!ip || ip.startsWith("192.168") || ip.startsWith("10.") || ip.startsWith("172.") || ip === "127.0.0.1")
+               return null;
+
+            // simple hash to scatter points (approximation without external API)
+            const parts = ip.split(".").map(Number);
+            if (parts.length !== 4) return null;
+
+            // Use octet values to approximate lon/lat ranges
+            const a = parts[0],
+               b = parts[1],
+               c = parts[2],
+               d = parts[3];
+
+            // IANA rough allocation heuristic
+            let lat, lon;
+            if (a < 50) {
+               lat = 45 + (b % 30);
+               lon = -100 + (c % 80);
+            } // NA
+            else if (a < 100) {
+               lat = 50 + (b % 15);
+               lon = 10 + (c % 30);
+            } // EU
+            else if (a < 150) {
+               lat = 20 + (b % 25);
+               lon = 70 + (c % 50);
+            } // Asia
+            else if (a < 180) {
+               lat = -25 + (b % 40);
+               lon = 130 + (c % 30);
+            } // Pac/AU
+            else if (a < 210) {
+               lat = -15 + (b % 30);
+               lon = -60 + (c % 40);
+            } // SA
+            else {
+               lat = 5 + (b % 20);
+               lon = 20 + (c % 40);
+            } // Africa
+
+            // add small jitter so same-subnet IPs don't stack exactly
+            lat += (d % 5) - 2;
+            lon += ((a + d) % 7) - 3;
+
+            return { lat: Math.max(-80, Math.min(80, lat)), lon: Math.max(-175, Math.min(175, lon)) };
+         }
+
+         function plotMapPoints(data) {
+            if (!mapSvg) return;
+            mapSvg.selectAll(".map-point").remove();
+            mapSvg.selectAll(".map-pulse").remove();
+
+            // group by IP
+            const ipMap = {};
+            data.forEach((d) => {
+               const ip = d.source_ip;
+               if (!ipMap[ip]) ipMap[ip] = { ip, count: 0, label: d.final_label, is_attack: d.is_attack };
+               ipMap[ip].count++;
+               if (d.is_attack) ipMap[ip].label = d.final_label;
+               ipMap[ip].is_attack = ipMap[ip].is_attack || d.is_attack;
+            });
+
+            const tooltip = document.getElementById("map-tooltip");
+
+            Object.values(ipMap).forEach(({ ip, count, label, is_attack }) => {
+               const geo = ipToGeo(ip);
+               if (!geo) return;
+
+               const [x, y] = mapProjection([geo.lon, geo.lat]);
+               if (!x || !y || isNaN(x) || isNaN(y)) return;
+
+               const color = is_attack ? COLORS[label] || "#ff3366" : "#00ff88";
+               const r = Math.min(3 + Math.sqrt(count) * 1.5, 14);
+
+               // pulse ring for attacks
+               if (is_attack) {
+                  mapSvg
+                     .append("circle")
+                     .attr("class", "map-pulse")
+                     .attr("cx", x)
+                     .attr("cy", y)
+                     .attr("r", r + 4)
+                     .attr("fill", "none")
+                     .attr("stroke", color)
+                     .attr("stroke-width", 1)
+                     .attr("opacity", 0.3);
+               }
+
+               mapSvg
+                  .append("circle")
+                  .attr("class", "map-point")
+                  .attr("cx", x)
+                  .attr("cy", y)
+                  .attr("r", r)
+                  .attr("fill", color)
+                  .attr("opacity", is_attack ? 0.85 : 0.5)
+                  .attr("stroke", color)
+                  .attr("stroke-width", 0.5)
+                  .style("cursor", "pointer")
+                  .on("mousemove", (event) => {
+                     tooltip.style.display = "block";
+                     tooltip.style.left = event.offsetX + 14 + "px";
+                     tooltip.style.top = event.offsetY - 10 + "px";
+                     tooltip.innerHTML = `${ip}<br>${label} · ${count} flow${count > 1 ? "s" : ""}`;
+                  })
+                  .on("mouseleave", () => {
+                     tooltip.style.display = "none";
+                  });
+            });
+         }
+
+         // ═══════════════════════════════════════════════
+         //  CHARTS
+         // ═══════════════════════════════════════════════
+         function renderLabelChart(data) {
+            const counts = {};
+            data.forEach((d) => (counts[d.final_label] = (counts[d.final_label] || 0) + 1));
+            const labels = Object.keys(counts);
+            const values = labels.map((l) => counts[l]);
+            const colors = labels.map((l) => COLORS[l] || "#4a6070");
+
+            mkChart("chart-labels", {
+               type: "doughnut",
+               data: {
+                  labels,
+                  datasets: [
+                     {
+                        data: values,
+                        backgroundColor: colors.map((c) => c + "cc"),
+                        borderColor: colors,
+                        borderWidth: 2,
+                     },
+                  ],
+               },
+               options: {
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  plugins: {
+                     legend: { position: "right", labels: { boxWidth: 10, padding: 12, font: { size: 11 } } },
+                  },
+               },
+            });
+         }
+
+         function renderTimeline(data) {
+            // bucket by minute
+            const buckets = {};
+            const labels_set = new Set();
+
+            data.forEach((d) => {
+               const t = d.timestamp ? d.timestamp.substring(0, 16).replace("T", " ") : "unknown";
+               if (!buckets[t]) buckets[t] = {};
+               buckets[t][d.final_label] = (buckets[t][d.final_label] || 0) + 1;
+               labels_set.add(d.final_label);
+            });
+
+            const times = Object.keys(buckets).sort().slice(-20); // last 20 minutes
+            const attackTypes = [...labels_set];
+
+            const datasets = attackTypes.map((label) => ({
+               label,
+               data: times.map((t) => buckets[t]?.[label] || 0),
+               borderColor: COLORS[label] || "#4a6070",
+               backgroundColor: (COLORS[label] || "#4a6070") + "22",
+               borderWidth: 1.5,
+               fill: true,
+               tension: 0.3,
+               pointRadius: 2,
+            }));
+
+            mkChart("chart-timeline", {
+               type: "line",
+               data: { labels: times.map((t) => t.substring(11)), datasets },
+               options: {
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } },
+                  scales: {
+                     x: { ticks: { font: { size: 9 }, maxRotation: 45 } },
+                     y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                  },
+               },
+            });
+         }
+
+         function renderFlagChart(data) {
+            const flags = ["SYN", "FIN", "RST", "ACK", "PSH"];
+            const attackTotals = { SYN: 0, FIN: 0, RST: 0, ACK: 0, PSH: 0 };
+            const normalTotals = { SYN: 0, FIN: 0, RST: 0, ACK: 0, PSH: 0 };
+
+            data.forEach((d) => {
+               if (!d.flags) return;
+               const target = d.is_attack ? attackTotals : normalTotals;
+               flags.forEach((f) => {
+                  target[f] += d.flags[f] || 0;
+               });
+            });
+
+            mkChart("chart-flags", {
+               type: "bar",
+               data: {
+                  labels: flags,
+                  datasets: [
+                     {
+                        label: "Attack",
+                        data: flags.map((f) => attackTotals[f]),
+                        backgroundColor: "#ff336688",
+                        borderColor: "#ff3366",
+                        borderWidth: 1,
+                     },
+                     {
+                        label: "Normal",
+                        data: flags.map((f) => normalTotals[f]),
+                        backgroundColor: "#00ff8844",
+                        borderColor: "#00ff88",
+                        borderWidth: 1,
+                     },
+                  ],
+               },
+               options: {
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } },
+                  scales: {
+                     x: { ticks: { font: { size: 11 } } },
+                     y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                  },
+               },
+            });
+         }
+
+         function renderConfChart(data) {
+            // histogram buckets 0-10%, 10-20%, ... 90-100%
+            const buckets = Array(10).fill(0);
+            data.forEach((d) => {
+               const c = d.dl_confidence || 0;
+               const idx = Math.min(Math.floor(c * 10), 9);
+               buckets[idx]++;
+            });
+            const labels = [
+               "0-10%",
+               "10-20%",
+               "20-30%",
+               "30-40%",
+               "40-50%",
+               "50-60%",
+               "60-70%",
+               "70-80%",
+               "80-90%",
+               "90-100%",
+            ];
+            const bgColors = buckets.map((_, i) => (i >= 8 ? "#00d4ff88" : i >= 5 ? "#ffaa0066" : "#ff336644"));
+
+            mkChart("chart-conf", {
+               type: "bar",
+               data: {
+                  labels,
+                  datasets: [{ label: "DL Confidence", data: buckets, backgroundColor: bgColors, borderWidth: 0 }],
+               },
+               options: {
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                     x: { ticks: { font: { size: 9 }, maxRotation: 45 } },
+                     y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                  },
+               },
+            });
+         }
+
+         function renderProtoChart(data) {
+            const counts = { TCP: 0, UDP: 0 };
+            data.forEach((d) => {
+               if (d.protocol) counts[d.protocol] = (counts[d.protocol] || 0) + 1;
+            });
+
+            mkChart("chart-proto", {
+               type: "doughnut",
+               data: {
+                  labels: ["TCP", "UDP"],
+                  datasets: [
+                     {
+                        data: [counts.TCP, counts.UDP],
+                        backgroundColor: ["#00d4ffaa", "#ffaa0099"],
+                        borderColor: ["#00d4ff", "#ffaa00"],
+                        borderWidth: 2,
+                     },
+                  ],
+               },
+               options: {
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  plugins: { legend: { labels: { font: { size: 12 }, boxWidth: 12 } } },
+               },
+            });
+         }
+
+         function renderTopIPs(data) {
+            const ipStats = {};
+            data.forEach((d) => {
+               const ip = d.source_ip;
+               if (!ipStats[ip]) ipStats[ip] = { ip, count: 0, attacks: 0, label: "Normal Traffic" };
+               ipStats[ip].count++;
+               if (d.is_attack) {
+                  ipStats[ip].attacks++;
+                  ipStats[ip].label = d.final_label;
+               }
+            });
+
+            const sorted = Object.values(ipStats)
+               .sort((a, b) => b.count - a.count)
+               .slice(0, 8);
+            const max = sorted[0]?.count || 1;
+
+            const badgeClass = (l) => {
+               if (l === "DoS" || l === "DDoS") return "dos";
+               if (l === "Port Scanning") return "scan";
+               if (l === "Brute Force") return "brute";
+               return "normal";
+            };
+
+            const rows = sorted
+               .map(
+                  ({ ip, count, attacks, label }) => `
+    <tr>
+      <td style="color:var(--accent);font-size:11px">${ip}</td>
+      <td>${count}</td>
+      <td><span class="badge ${badgeClass(attacks > 0 ? label : "Normal Traffic")}">${attacks > 0 ? label : "Normal"}</span></td>
+      <td style="width:60px">
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((count / max) * 100)}%;background:${attacks > 0 ? "var(--accent2)" : "var(--accent3)"}"></div></div>
+      </td>
+    </tr>`,
+               )
+               .join("");
+
+            document.getElementById("ip-table-wrap").innerHTML = `
+    <table class="ip-table">
+      <thead><tr><th>Source IP</th><th>Flows</th><th>Label</th><th>Rate</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+         }
+
+         function renderDecisionSource(data) {
+            const counts = { heuristic: 0, dl: 0, both: 0, heuristic_fallback: 0, dl_fallback: 0 };
+            data.forEach((d) => {
+               if (d.decided_by) counts[d.decided_by] = (counts[d.decided_by] || 0) + 1;
+            });
+
+            const items = [
+               { key: "heuristic", badge: "[H]", label: "Heuristic", color: "var(--warn)" },
+               { key: "dl", badge: "[D]", label: "DL Model", color: "var(--accent)" },
+               { key: "both", badge: "[H+D]", label: "Both Agree", color: "var(--accent3)" },
+               { key: "heuristic_fallback", badge: "[H~]", label: "Heuristic F/B", color: "#ff8844" },
+               { key: "dl_fallback", badge: "[D~]", label: "DL Fallback", color: "#8899ff" },
+            ];
+
+            document.getElementById("source-grid").innerHTML = items
+               .map(
+                  ({ key, badge, label, color }) => `
+    <div class="source-item">
+      <div class="source-badge" style="color:${color}">${badge}</div>
+      <div class="source-count" style="color:${color}">${counts[key] || 0}</div>
+      <div class="source-label">${label}</div>
+    </div>`,
+               )
+               .join("");
+         }
+
+         function renderAlerts(data) {
+            const recent = [...data].reverse().slice(0, 60);
+            const dotClass = (d) => {
+               if (d.final_label === "Port Scanning") return "yellow";
+               if (d.final_label === "Normal Traffic") return "green";
+               if (d.final_label === "Brute Force") return "blue";
+               return "red";
+            };
+            const labelClass = (d) => {
+               if (d.final_label === "Normal Traffic") return "normal";
+               if (d.final_label === "Port Scanning") return "scan";
+               return "attack";
+            };
+            const ts = (t) => (t ? t.substring(11, 19) : "");
+
+            document.getElementById("alert-list").innerHTML = recent
+               .map(
+                  (d) => `
+    <div class="alert-item">
+      <div class="alert-dot ${dotClass(d)}"></div>
+      <div class="alert-content">
+        <div class="alert-label ${labelClass(d)}">${d.final_label}</div>
+        <div class="alert-ip">${d.source_ip} → ${d.dest_ip || "?"}:${d.dest_port || "?"} · ${d.decided_by || "?"}</div>
+      </div>
+      <div class="alert-time">${ts(d.timestamp)}</div>
+    </div>`,
+               )
+               .join("");
+
+            document.getElementById("alert-count").textContent = `${data.length} events`;
+         }
+
+         // ═══════════════════════════════════════════════
+         //  STATS
+         // ═══════════════════════════════════════════════
+         function updateStats(data) {
+            const total = data.length;
+            const attacks = data.filter((d) => d.is_attack).length;
+            const scans = data.filter((d) => d.final_label === "Port Scanning").length;
+            const dos = data.filter((d) => ["DoS", "DDoS"].includes(d.final_label)).length;
+            const normal = data.filter((d) => !d.is_attack).length;
+            const ips = new Set(data.map((d) => d.source_ip)).size;
+
+            document.getElementById("s-total").textContent = total.toLocaleString();
+            document.getElementById("s-attacks").textContent = attacks.toLocaleString();
+            document.getElementById("s-attack-pct").textContent = total
+               ? `${Math.round((attacks / total) * 100)}% of traffic`
+               : "—";
+            document.getElementById("s-scan").textContent = scans.toLocaleString();
+            document.getElementById("s-dos").textContent = dos.toLocaleString();
+            document.getElementById("s-normal").textContent = normal.toLocaleString();
+            document.getElementById("s-ips").textContent = ips.toLocaleString();
+         }
+
+         // ═══════════════════════════════════════════════
+         //  MAIN RENDER
+         // ═══════════════════════════════════════════════
+         function renderAll(data) {
+            if (!data || data.length === 0) return;
+
+            updateStats(data);
+            renderLabelChart(data);
+            renderTimeline(data);
+            renderFlagChart(data);
+            renderConfChart(data);
+            renderProtoChart(data);
+            renderTopIPs(data);
+            renderDecisionSource(data);
+            renderAlerts(data);
+            plotMapPoints(data);
+
+            const last = data[data.length - 1];
+            document.getElementById("last-updated").textContent =
+               "Updated: " + (last?.timestamp?.substring(0, 19)?.replace("T", " ") || "now");
+            document.getElementById("status-text").textContent = "LIVE";
+         }
+
+         // ═══════════════════════════════════════════════
+         //  FILE LOADER
+         // ═══════════════════════════════════════════════
+         document.getElementById("json-file").addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+               try {
+                  const data = JSON.parse(ev.target.result);
+                  document.getElementById("demo-banner").style.display = "none";
+                  renderAll(Array.isArray(data) ? data : [data]);
+               } catch (err) {
+                  alert("Invalid JSON file: " + err.message);
+               }
+            };
+            reader.readAsText(file);
+         });
+
+         // ═══════════════════════════════════════════════
+         //  DEMO DATA GENERATOR
+         // ═══════════════════════════════════════════════
+         function loadDemo() {
+            document.getElementById("demo-banner").style.display = "flex";
+            const labels = ["Normal Traffic", "DoS", "Port Scanning", "DDoS", "Brute Force"];
+            const weights = [0.45, 0.25, 0.15, 0.1, 0.05];
+            const protos = ["TCP", "UDP"];
+            const srcs = [
+               "45.33.32.156",
+               "198.51.100.4",
+               "203.0.113.42",
+               "185.220.101.5",
+               "91.108.4.12",
+               "104.21.44.123",
+               "185.100.87.12",
+               "51.15.45.33",
+               "212.92.127.12",
+               "66.249.66.1",
+               "192.168.10.102",
+               "10.0.0.45",
+               "103.21.244.0",
+               "77.88.55.80",
+               "89.207.132.170",
+               "143.244.34.62",
+            ];
+            const sources = ["heuristic", "dl", "both", "heuristic_fallback", "dl_fallback"];
+            const now = Date.now();
+
+            const pick = (arr, w) => {
+               const r = Math.random(),
+                  cum = [];
+               let s = 0;
+               (w || arr.map(() => 1 / arr.length)).forEach((v) => {
+                  s += v;
+                  cum.push(s);
+               });
+               return arr[cum.findIndex((c) => r < c)];
+            };
+
+            const data = Array.from({ length: 300 }, (_, i) => {
+               const label = pick(labels, weights);
+               const is_atk = label !== "Normal Traffic";
+               const ts = new Date(now - (300 - i) * 4000).toISOString();
+               const src = pick(srcs);
+               const conf = is_atk ? 0.5 + Math.random() * 0.5 : 0.8 + Math.random() * 0.2;
+               const decided = is_atk && label === "Port Scanning" ? "heuristic" : pick(sources);
+
+               return {
+                  timestamp: ts,
+                  source_ip: src,
+                  dest_ip: `10.0.0.${Math.floor(Math.random() * 10) + 1}`,
+                  dest_port: [80, 443, 22, 8080, 3389, 53][Math.floor(Math.random() * 6)],
+                  protocol: pick(protos),
+                  final_label: label,
+                  is_attack: is_atk,
+                  decided_by: decided,
+                  dl_prediction: label,
+                  dl_confidence: parseFloat(conf.toFixed(4)),
+                  heuristic_label: label,
+                  unique_ports_seen:
+                     label === "Port Scanning"
+                        ? 20 + Math.floor(Math.random() * 30)
+                        : Math.floor(Math.random() * 3) + 1,
+                  flows_from_ip: Math.floor(Math.random() * 100) + 1,
+                  packet_count: Math.floor(Math.random() * 500) + 1,
+                  pkt_per_sec: parseFloat((Math.random() * 2000).toFixed(2)),
+                  bytes_per_sec: parseFloat((Math.random() * 500000).toFixed(2)),
+                  duration_ms: Math.floor(Math.random() * 5000),
+                  flags: {
+                     SYN: is_atk ? Math.floor(Math.random() * 20) : Math.floor(Math.random() * 3),
+                     FIN: Math.floor(Math.random() * 5),
+                     RST: Math.floor(Math.random() * 8),
+                     ACK: Math.floor(Math.random() * 15),
+                     PSH: Math.floor(Math.random() * 10),
+                  },
+               };
+            });
+
+            renderAll(data);
+         }
+
+         // ═══════════════════════════════════════════════
+         //  INIT
+         // ═══════════════════════════════════════════════
+         window.addEventListener("load", () => {
+            initMap();
+         });
+      </script>
+   </body>
+</html>

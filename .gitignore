@@ -1,0 +1,19 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+.env
+# Ignore the captured data and logs
+ids_logs.json
+*.json
+*.log
+*.csv
+
+
+# Ignore the actual model weights (they are too big anyway)
+# DL model/*.pkl
+# DL model/*.joblib
+
+# Ignore environment files
+.venv/
+__pycache__/
