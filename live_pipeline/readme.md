@@ -179,4 +179,49 @@ Attacker        Server
 
 ---
 
+data set genration -> network flow -> feature extration -> dl model load -> classyfy -> herutic engin -> etc... 
 
+
+
+
+---
+
+# Model load 
+ load_dl_system()
+      ↓
+  joblib loads scaler, le, feature_cols
+      ↓
+  build empty SimpleMLP shell
+      ↓
+  load_state_dict → plug in trained weights
+      ↓
+  model.eval() → disable dropout
+      ↓
+  ready to classify flows instantly
+
+
+---
+
+# dl model prediction on run time 
+ features dict
+     ↓
+numpy array (1 × N_FEATURES)
+     ↓
+clean NaN/inf → 0
+     ↓
+scale to same range
+     ↓
+pytorch tensor → GPU/CPU
+     ↓
+neural network → raw logits
+     ↓
+softmax → probabilities
+     ↓
+argmax → winning class index
+     ↓
+label decoder → "Port Scanning"
+     ↓
+return ("Port Scanning", 0.9312)
+
+
+---

@@ -13,9 +13,9 @@ class SimpleMLP(nn.Module):
     def __init__(self, input_dim: int, num_classes: int):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Linear(input_dim, 128), nn.ReLU(), nn.Dropout(0.2),
+            nn.Linear(input_dim, 128), nn.ReLU(), nn.Dropout(0.2), # input_dim is the number of features 
             nn.Linear(128, 64),        nn.ReLU(), nn.Dropout(0.2),
-            nn.Linear(64, num_classes)
+            nn.Linear(64, num_classes)  # num_classes is the number of output classes 
         )
 
 
@@ -23,6 +23,18 @@ class SimpleMLP(nn.Module):
     def forward(self, x):
         return self.network(x)
 
+"""  load_dl_system()
+      ↓
+  joblib loads scaler, le, feature_cols
+      ↓
+  build empty SimpleMLP shell
+      ↓
+  load_state_dict → plug in trained weights
+      ↓
+  model.eval() → disable dropout
+      ↓
+  ready to classify flows instantly
+  """""
 
 def load_dl_system():
     try:
@@ -55,6 +67,27 @@ MODEL, SCALER, LE, FEATURE_COLS, DEVICE = load_dl_system()
 
 
 
+"""
+features dict
+     ↓
+numpy array (1 × N_FEATURES)
+     ↓
+clean NaN/inf → 0
+     ↓
+scale to same range
+     ↓
+pytorch tensor → GPU/CPU
+     ↓
+neural network → raw logits
+     ↓
+softmax → probabilities
+     ↓
+argmax → winning class index
+     ↓
+label decoder → "Port Scanning"
+     ↓
+return ("Port Scanning", 0.9312)
+"""
 
 def dl_classify(features: dict):
 
@@ -90,3 +123,6 @@ def dl_classify(features: dict):
 #   # a string  →  "Port Scanning"
 # round(conf.item(), 4)   →  0.9312
     return label, round(conf.item(), 4)    
+
+
+
