@@ -150,3 +150,33 @@ Attacker        Server
   |                |
          Server CPU/RAM exhausted
          Legitimate users can't get in
+
+
+---
+
+#  7. DL CLASSIFY  (from Code 3)
+# ═══════════════════════════════════════════════════════════════
+
+# features dict
+#      ↓
+# numpy array (1 × N_FEATURES)
+#      ↓
+# clean NaN/inf → 0
+#      ↓
+# scale to same range
+#      ↓
+# pytorch tensor → GPU/CPU
+#      ↓
+# neural network → raw logits
+#      ↓
+# softmax → probabilities
+#      ↓
+# argmax → winning class index
+#      ↓
+# label decoder → "Port Scanning"
+#      ↓
+# return ("Port Scanning", 0.9312)
+
+---
+
+
