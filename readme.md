@@ -65,33 +65,42 @@ graph TD
 
 ## Operational Flow (Activity Diagram)
 
-The detailed workflow of a single network flow being processed by the system.
+The following flowchart details the processing lifecycle of a network flow.
 
 ```mermaid
-activityDiagram
-    start
-    :Capture Packet Stream;
-    :Aggregate into Flow (NFStreamer);
-    :Extract 50+ Statistical Features;
-    fork
-        :Run Heuristic Rules;
-        :Check Port Scanning;
-        :Calculate Flag Ratios;
-    fork again
-        :Pre-process (Scaler);
-        :MLP Forward Pass;
-        :Softmax Confidence;
-    end fork
-    :Hybrid Fusion Decision;
-    if (Is Threat?) then (Yes)
-        :Generate Alert;
-        :Log to Supabase;
-        :Push to Mobile App;
-    else (No)
-        :Log as Normal Traffic;
-    end i
-    :Update Local History;
-    stop
+flowchart TD
+    START([Start]) --> CAPTURE[Capture Packet Stream]
+    CAPTURE --> AGGREGATE[Aggregate into Flow\nNFStreamer]
+    AGGREGATE --> EXTRACT[Extract 50+ Statistical Features]
+    
+    EXTRACT --> FORK{ }
+    
+    subgraph DETECTION [Dual Detection Engine]
+        direction TB
+        FORK --> HEURISTIC[Run Heuristic Rules]
+        HEURISTIC --> SCAN[Check Port Scanning]
+        SCAN --> RATIOS[Calculate Flag Ratios]
+        
+        FORK --> DL_PRE[Pre-process Scaler]
+        DL_PRE --> MLP[MLP Forward Pass]
+        MLP --> CONF[Softmax Confidence]
+    end
+    
+    RATIOS --> FUSION[Hybrid Fusion Decision]
+    CONF --> FUSION
+    
+    FUSION --> THREAT{Is Threat?}
+    
+    THREAT -- Yes --> ALERT[Generate Alert]
+    ALERT --> LOG_CLOUD[Log to Supabase]
+    LOG_CLOUD --> PUSH[Push to Mobile App]
+    
+    THREAT -- No --> LOG_NORMAL[Log as Normal Traffic]
+    
+    PUSH --> UPDATE[Update Local History]
+    LOG_NORMAL --> UPDATE
+    
+    UPDATE --> END([Stop])
 ```
 
 ---
