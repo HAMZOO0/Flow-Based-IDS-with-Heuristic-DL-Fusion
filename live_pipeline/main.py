@@ -26,13 +26,11 @@ def run(interface: str):
         flow_num += 1
         features = extract_features(flow)
 
-        final_label, final_conf, decided_by = hybrid_classify(flow, features)  # this function return us final label and confidence score and also it return us which module is decding the label
+        final_label, final_conf, decided_by = hybrid_classify(flow, features)  
 
-#       here we get raw label from heuristic and dl to log in json file and also for terminal output
         h_label           = peek_heuristic(flow, features)
         dl_label, dl_conf = dl_classify(features)
 
-#  store the counts of each label and source for summary statistics (not used in real-time decision making, just for monitoring)
         label_counts[final_label]  += 1
         source_counts[decided_by]  += 1
 

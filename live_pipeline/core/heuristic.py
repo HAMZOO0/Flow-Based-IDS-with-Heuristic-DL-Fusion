@@ -37,7 +37,7 @@ def heuristic_label(flow, features: dict) -> str:
 
 
     flow_counter[flow.src_ip] += 1  # we count how many flows are coming from this src ip
-    print("flow_counter", flow_counter )
+    # print("flow_counter", flow_counter )
 
     unique_ports = len(port_tracker[flow.src_ip])
     is_scan      = unique_ports >= PORT_SCAN_THRESHOLD
@@ -45,7 +45,7 @@ def heuristic_label(flow, features: dict) -> str:
     # If one IP creates 50 or more flows, but only to a very small number of ports (≤ 3) → it is considered a FLOOD attack.
     is_flood     = (flow_counter[flow.src_ip] >= FLOOD_FLOW_THRESHOLD
                     and unique_ports <= 3) 
-    # print("is_flood", is_flood )
+    print("flow_counter", flow_counter[flow.src_ip], is_flood , unique_ports )
 
     is_broadcast = (dst_ip.endswith(".255") or dst_ip.startswith("224.")
                     or dst_ip.startswith("239.") or dst_ip.startswith("192."))
