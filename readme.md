@@ -202,7 +202,7 @@ graph TD
 The following curves show the training progress over 150 epochs, achieving high accuracy and low loss.
 
 <p align="center">
-  <img src="image-2.png" alt="Training and Validation Curves" width="800">
+  <img src="public/image-2.png" alt="Training and Validation Curves" width="800">
 </p>
 
 ---
@@ -220,7 +220,7 @@ The dataset used for this project was **manually created** by capturing live net
 The top 15 most influential features in the Deep Learning model's decision-making process:
 
 <p align="center">
-  <img src="image-4.png" alt="Top 15 Influential Features" width="700">
+  <img src="public/image-4.png" alt="Top 15 Influential Features" width="700">
 </p>
 
 ---
@@ -229,11 +229,28 @@ The top 15 most influential features in the Deep Learning model's decision-makin
 
 - **Supabase Backend**: All attack logs are stored in a Supabase PostgreSQL database.
 - **Row Level Security (RLS)**: Ensures data integrity and secure access to logs.
+- **Web Dashboard**: A real-time visualization interface for network monitoring.
 - **Mobile App**: A companion mobile application provides real-time alerts and traffic visualization.
 
+### Live Dashboard
 <p align="center">
-  <img src="https://via.placeholder.com/300x600?text=Mobile+App+Screen+1" width="200">
-  <img src="https://via.placeholder.com/300x600?text=Mobile+App+Screen+2" width="200">
+  <img src="public/image-5.png" alt="Live Dashboard Visualization" width="900">
+</p>
+
+### Mobile App Suite
+<p align="center">
+  <table>
+    <tr>
+      <td align="center"><img src="public/image-6.png" width="200"><br><sub>Authentication</sub></td>
+      <td align="center"><img src="public/image-7.png" width="200"><br><sub>Live Monitoring</sub></td>
+      <td align="center"><img src="public/image-8.png" width="200"><br><sub>Attack Logs</sub></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="public/image-9.png" width="200"><br><sub>Traffic Stats</sub></td>
+      <td align="center"><img src="public/image-10.png" width="200"><br><sub>Alert Details</sub></td>
+      <td align="center"></td>
+    </tr>
+  </table>
 </p>
 
 ---
@@ -244,7 +261,7 @@ The top 15 most influential features in the Deep Learning model's decision-makin
 The confusion matrix below demonstrates the model's performance across the 3 target classes.
 
 <p align="center">
-  <img src="image-3.png" alt="Confusion Matrix" width="600">
+  <img src="public/image-3.png" alt="Confusion Matrix" width="600">
 </p>
 
 | Attack Type | Detection Layer | Accuracy |
@@ -261,22 +278,34 @@ The confusion matrix below demonstrates the model's performance across the 3 tar
 
 ```
 firewall/
-├── live_pipeline/
+├── live_pipeline/             ← Real-time detection pipeline
 │   ├── main.py                ← Main IDS entry point
-│   ├── core/
+│   ├── config.py              ← Pipeline configuration
+│   ├── core/                  ← Detection & processing core
+│   │   ├── dl_model.py        ← Deep Learning inference (MLP/1D-CNN)
+│   │   ├── features.py        ← CICIDS2017 feature extraction
 │   │   ├── fusion.py          ← Hybrid Fusion Logic
-│   │   ├── heuristic.py       ← Heuristic Engine
-│   │   ├── dl_model.py        ← DL Model Inference
-│   │   └── logger.py          ← Local & Cloud Logging
-├── data_pipeline/
+│   │   ├── heuristic.py       ← Rule-based Heuristic Engine
+│   │   └── logger.py          ← Local JSON & Supabase logging
+│   └── api/
+│       └── app.py             ← Supabase Flask API & Cloud Store
+├── data_pipeline/             ← Offline data operations
 │   └── dataset_generator/
-│       └── main.py            ← Traffic Capture & Labeling
-├── models/                    ← Saved Model Artifacts
-│   ├── model.pkl
-│   ├── scaler.pkl
-│   └── label_encoder.pkl
-└── data/
-    └── dataSet/               ← Manually generated dataset
+│       └── main.py            ← Traffic capture & heuristic labeling
+├── models/                    ← Trained model repositories
+│   ├── mlp/                   ← Multi-Layer Perceptron artifacts
+│   │   ├── best_model.pkl
+│   │   ├── scaler.pkl
+│   │   └── label_encoder.pkl
+│   └── 1d cnn/                ← 1D-Convolutional Neural Network
+│       └── best_model.pkl
+├── legacy/                    ← Previous iterations & tools
+│   ├── CICFlowmeter/          ← Java-based feature extractor
+│   └── Firewall - scapy/      ← Scapy-based capture script
+├── data/
+│   ├── dataSet/               ← Manually generated CICIDS2017 datasets
+│   └── logs/                  ← Local IDS log storage
+└── public/                    ← Documentation assets (images, results)
 ```
 
 ---
