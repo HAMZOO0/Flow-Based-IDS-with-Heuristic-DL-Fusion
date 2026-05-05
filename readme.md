@@ -240,6 +240,7 @@ The top 15 most influential features in the Deep Learning model's decision-makin
 - **Row Level Security (RLS)**: Ensures data integrity and secure access to logs.
 - **Web Dashboard**: A real-time visualization interface for network monitoring.
 - **Mobile App**: A companion mobile application provides real-time alerts and traffic visualization.
+- **Mobile App Repository**: https://github.com/MOSHO1133/DoS-Sentinel
 
 ### Live Dashboard
 <p align="center">
