@@ -7,7 +7,8 @@ env/
 ids_logs.json
 *.json
 *.log
-*.csv
+# *.csv
+# removethis file  capture_flow.csv
 
 
 # Ignore the actual model weights (they are too big anyway)

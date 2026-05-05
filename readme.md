@@ -317,10 +317,4 @@ firewall/
 └── public/                    ← Documentation assets (images, results)
 ```
 
----
 
-## License
-
-MIT — see [LICENSE](LICENSE)
-
-*Built by Hamza Sajid · 2026*
