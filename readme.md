@@ -3,6 +3,9 @@
 > A real-time Intrusion Detection System combining a **heuristic rule engine** and a **Deep Learning MLP** to detect DoS, DDoS, Port Scanning, and Brute Force attacks on live network traffic. Integrated with Supabase for cloud reporting and a mobile app for real-time monitoring.
 
 ---
+![alt text](<./public/main2.png>)
+
+---
 
 ## Table of Contents
 
@@ -319,3 +322,4 @@ firewall/
 ```
 
 
+![alt text](public/main1.png)
